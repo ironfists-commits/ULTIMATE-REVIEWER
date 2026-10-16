@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Assessment & Reviewer App</title>
+
+    <!-- Firebase Compatibility SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --pandayan-maroon: #7A1C1C;
+            --pandayan-dark-maroon: #4E1010;
+            --pandayan-yellow: #FFD700;
+            --pandayan-light-yellow: #FFF9E6;
+            --bg-color: #f7f5f2;
+            --text-dark: #2b2b2b;
+            --white: #ffffff;
+            --green: #28a745;
+            --red: #dc3545;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        @media (max-width: 992px) {
+            body {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+                overflow-y: auto;
+            }
+        }
+
+        /* Login Overlay */
+        #login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(78, 16, 16, 0.96);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 15px;
+        }
+
+        .login-card {
+            background: var(--white);
+            padding: 35px 30px;
+            border-radius: 14px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+            border-top: 8px solid var(--pandayan-yellow);
+            text-align: center;
+        }
+
+        .login-card h2 { color: var(--pandayan-maroon); margin-bottom: 8px; font-size: 1.5rem; }
+        .login-card p { font-size: 0.9rem; color: #666; margin-bottom: 22px; }
+        .login-card input {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 18px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .login-card input:focus { border-color: var(--pandayan-maroon); }
+        .login-card button {
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            background-color: var(--pandayan-maroon);
+            color: var(--pandayan-yellow);
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .login-card button:hover { background-color: var(--pandayan-dark-maroon); }
+
+        /* Navigation */
+        nav {
+            width: 250px;
+            background-color: var(--pandayan-dark-maroon);
+            color: var(--white);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 4px 0 12px rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+        @media (max-width: 992px) { nav { width: 100%; } }
+
+        .nav-header { padding: 22px 15px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-header h2 { color: var(--pandayan-yellow); font-size: 1.25rem; font-weight: 700; }
+
+        .nav-links { list-style: none; padding: 12px 0; flex-grow: 1; }
+        .nav-links li {
+            padding: 15px 20px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.92rem;
+            color: #ebdcd2;
+        }
+        .nav-links li:hover, .nav-links li.active {
+            background-color: var(--pandayan-maroon);
+            color: var(--pandayan-yellow);
+            border-left: 6px solid var(--pandayan-yellow);
+        }
+
+        /* Main Content Container */
+        main {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 25px;
+            background: var(--bg-color);
+        }
+
+        .tab-content { display: none; max-width: 1280px; margin: 0 auto; }
+        .tab-content.active { display: block; }
+
+        .card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 22px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+            border-top: 5px solid var(--pandayan-maroon);
+        }
+
+        /* Side-by-Side Layout for Quiz + Classmate Live Feed */
+        .quiz-workspace-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 992px) {
+            .quiz-workspace-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Quiz Box */
+        .quiz-box {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 10px;
+            border-top: 6px solid var(--pandayan-yellow);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            position: relative;
+        }
+
+        .input-text-area {
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .input-text-area:focus {
+            border-color: var(--pandayan-maroon);
+        }
+
+        /* Familiarity Level Progress Bar */
+        .familiarity-container {
+            background: var(--pandayan-light-yellow);
+            border: 1px solid #f0e6b8;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 18px;
+        }
+
+        .familiarity-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.88rem;
+            font-weight: bold;
+            color: var(--pandayan-dark-maroon);
+            margin-bottom: 6px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 14px;
+            background-color: #e2ded0;
+            border-radius: 7px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--green);
+            transition: width 0.4s ease;
+        }
+
+        /* Praise Banner Popup */
+        .praise-banner {
+            display: none;
+            background: linear-gradient(135deg, var(--pandayan-maroon), var(--pandayan-dark-maroon));
+            color: var(--pandayan-yellow);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.05rem;
+            margin-bottom: 18px;
+            box-shadow: 0 4px 12px rgba(122, 28, 28, 0.25);
+            animation: popIn 0.35s ease-out;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Explanation Box */
+        .explanation-box {
+            background: #FFFDF0;
+            border: 1px solid #F0E6B8;
+            border-left: 6px solid var(--pandayan-maroon);
+            padding: 18px;
+            margin-top: 18px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .study-section {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #E0D5A0;
+        }
+
+        /* Live Progress Sidebar Table */
+        .sidebar-live-box {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 10px;
+            border-top: 6px solid var(--pandayan-maroon);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+        }
+
+        .sidebar-live-box h3 {
+            font-size: 1.1rem;
+            color: var(--pandayan-maroon);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-peer-list {
+            list-style: none;
+            max-height: 520px;
+            overflow-y: auto;
+        }
+
+        .live-peer-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.88rem;
+        }
+
+        .live-peer-item:last-child {
+            border-bottom: none;
+        }
+
+        .online-tag { background: #28a745; color: white; padding: 2px 7px; border-radius: 10px; font-size: 0.72rem; font-weight: bold; }
+        .offline-tag { background: #6c757d; color: white; padding: 2px 7px; border-radius: 10px; font-size: 0.72rem; font-weight: bold; }
+
+        /* Tables for Admin & Full View */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
+        th { background-color: var(--pandayan-maroon); color: var(--pandayan-yellow); }
+
+        .action-btn { padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 5px; }
+        .edit-btn { background-color: var(--pandayan-yellow); color: var(--pandayan-dark-maroon); }
+        .delete-btn { background-color: var(--red); color: white; }
+    </style>
+</head>
+<body>
+
+    <!-- Login Modal -->
+    <div id="login-overlay">
+        <div class="login-card">
+            <h2>📜 Student Portal Login</h2>
+            <p>Please enter your Full Name to continue.</p>
+            <input type="text" id="loginName" placeholder="Full Name (e.g. Juan Cruz)">
+            <button onclick="loginUser()">🚀 LOG IN</button>
+        </div>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav>
+        <div>
+            <div class="nav-header">
+                <h2>📖 Assessment App</h2>
+            </div>
+            <ul class="nav-links">
+                <li class="active" onclick="switchTab('dashboard', this)">📊 Dashboard</li>
+                <li onclick="switchTab('quiz', this)">✍️ Assessment Exam</li>
+                <li onclick="switchTab('classmates', this)">👥 Class Progress (Live)</li>
+                <li onclick="switchTab('admin', this)">🔒 Admin Access</li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- DASHBOARD TAB -->
+        <div id="dashboard" class="tab-content active">
+            <div class="card">
+                <h1 id="welcomeHeader">Welcome!</h1>
+                <p>Connected to Firebase Realtime Database (1,000-Item Old Testament Module).</p>
+            </div>
+            
+            <div class="card">
+                <h3>📈 Your Progress Summary</h3>
+                <br>
+                <p style="margin-bottom: 8px;">Current Score: <strong id="myScoreText" style="color: var(--green); font-size: 1.1rem;">0/0</strong></p>
+                <div class="familiarity-container">
+                    <div class="familiarity-header">
+                        <span>Level of Familiarity</span>
+                        <span id="myFamiliarityPercent">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="myFamiliarityBar" class="progress-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QUIZ TAB -->
+        <div id="quiz" class="tab-content">
+            <div class="quiz-workspace-grid">
+                
+                <!-- LEFT COLUMN: QUIZ ENGINE -->
+                <div class="quiz-box">
+                    <div id="quiz-header" style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 0.9rem;">
+                        <span id="quiz-status-text" style="font-weight: bold; color: var(--pandayan-maroon);">Loading Old Testament questions...</span>
+                        <span>Score: <strong id="quiz-live-score" style="color: var(--green);">0/0</strong></span>
+                    </div>
+
+                    <div class="familiarity-container">
+                        <div class="familiarity-header">
+                            <span>Level of Familiarity</span>
+                            <span id="quizFamiliarityPercent">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="quizFamiliarityBar" class="progress-bar-fill"></div>
+                        </div>
+                    </div>
+
+                    <div id="praiseBanner" class="praise-banner"></div>
+
+                    <h3 id="question-text" style="margin-bottom: 15px; font-size: 1.15rem; color: #222;">Awaiting question...</h3>
+                    
+                    <div id="answer-area">
+                        <input type="text" id="openAnswerInput" class="input-text-area" placeholder="Type your answer here...">
+                    </div>
+
+                    <button id="submitAndNextBtn" onclick="submitUserAnswer()" style="padding: 12px 24px; background: var(--pandayan-maroon); color: var(--pandayan-yellow); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; width: 100%;">Submit Answer</button>
+
+                    <div id="explanationBox" class="explanation-box" style="display: none;">
+                        <div id="explanationTitle" style="font-weight: bold; font-size: 1.1rem; margin-bottom: 10px;"></div>
+                        <div id="explanationDetails"></div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: LIVE SIDEBAR CLASS PROGRESS -->
+                <div class="sidebar-live-box">
+                    <h3>👥 Live Class Leaderboard</h3>
+                    <p style="font-size: 0.8rem; color: #666; margin-bottom: 12px;">Real-time scores & status of your peers.</p>
+                    
+                    <ul class="live-peer-list" id="sidebarPeerList">
+                        <li style="font-size: 0.85rem; color: #777;">Loading classmates...</li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- FULL CLASSMATES LIVE PROGRESS TAB -->
+        <div id="classmates" class="tab-content">
+            <div class="card">
+                <h2>👥 Live Classmate Progress & Online Status</h2>
+                <p>Track real-time progress and active online status of your peers.</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Status</th>
+                            <th>Score (Correct / Answered)</th>
+                            <th>Familiarity Level (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="classmatesTableBody">
+                        <tr><td colspan="4">Loading data from Firebase...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ADMIN PANEL TAB -->
+        <div id="admin" class="tab-content">
+            <div class="card" id="adminLockCard">
+                <h2>🔒 Admin Control Panel</h2>
+                <p>Enter the Admin Password to unlock full management controls.</p>
+                <br>
+                <input type="password" id="adminPassInput" placeholder="Enter Admin Password" style="padding: 10px; width: 250px; border: 1px solid #ccc; border-radius: 4px;">
+                <button onclick="unlockAdmin()" style="padding: 10px 15px; background: var(--pandayan-maroon); color: var(--pandayan-yellow); border:none; border-radius: 4px; cursor: pointer; font-weight: bold;">Unlock Admin</button>
+            </div>
+
+            <div class="card" id="adminContentCard" style="display: none;">
+                <h2>⚙️ Admin Controls: Manage Student Data</h2>
+                <p>Modify scores, familiarity levels, or remove student records in real time.</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Score</th>
+                            <th>Familiarity (%)</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminTableBody">
+                        <!-- Dynamic Student Controls -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ============================================================
+        // 1. FIREBASE CONFIGURATION
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyATfV5iWkkmxRcxKQL4EZNDoVDEe6WtAbk",
+            authDomain: "myreviewerapp-d9108.firebaseapp.com",
+            databaseURL: "https://myreviewerapp-d9108-default-rtdb.firebaseio.com",
+            projectId: "myreviewerapp-d9108",
+            storageBucket: "myreviewerapp-d9108.firebasestorage.app",
+            messagingSenderId: "602073112719",
+            appId: "1:602073112719:web:dce6bb3183a9a07c5390fa"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Application States
+        let currentUser = "";
+        let currentUserId = "";
+        let userScore = 0;
+        let answeredCount = 0;
+        
+        let allMasterQuestions = []; 
+        let availableQuestions = [];  
+        
+        let currentQuestion = null;
+        let isAnsweredCurrent = false;
+
+        const ntKeywords = [
+            "matthew", "mark", "luke", "john", "acts", "romans", "corinthians", "galatians", 
+            "ephesians", "philippians", "colossians", "thessalonians", "timothy", "titus", 
+            "philemon", "hebrews", "james", "peter", "jude", "revelation", "bagong tipan", "new testament"
+        ];
+
+        // ============================================================
+        // 2. LOGIN & ONLINE PRESENCE TRACKING
+        // ============================================================
+        function loginUser() {
+            const nameInput = document.getElementById('loginName').value.trim();
+            if (!nameInput) {
+                alert("Please enter your name.");
+                return;
+            }
+
+            currentUser = nameInput;
+            currentUserId = nameInput.replace(/[.#$\[\]]/g, "_");
+
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('welcomeHeader').textContent = `Welcome, ${currentUser}!`;
+
+            const userRef = db.ref('users/' + currentUserId);
+            
+            userRef.update({
+                name: currentUser,
+                status: 'online',
+                lastSeen: Date.now()
+            });
+
+            userRef.onDisconnect().update({
+                status: 'offline'
+            });
+
+            listenToMyProgress();
+            listenToClassmatesProgress();
+            loadQuestionsFromFirebase();
+        }
+
+        function switchTab(tabId, elem) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (elem) elem.classList.add('active');
+        }
+
+        // ============================================================
+        // 3. REALTIME DATA LISTENERS & PROGRESS
+        // ============================================================
+        function listenToMyProgress() {
+            db.ref('users/' + currentUserId).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    userScore = data.score || 0;
+                    let familiarity = data.familiarity || 0;
+                    if (data.answeredCount !== undefined) {
+                        answeredCount = data.answeredCount;
+                    }
+
+                    const formattedScore = `${userScore}/${answeredCount}`;
+
+                    document.getElementById('myScoreText').textContent = formattedScore;
+                    document.getElementById('quiz-live-score').textContent = formattedScore;
+                    
+                    document.getElementById('myFamiliarityPercent').textContent = `${familiarity}%`;
+                    document.getElementById('myFamiliarityBar').style.width = `${familiarity}%`;
+
+                    document.getElementById('quizFamiliarityPercent').textContent = `${familiarity}%`;
+                    document.getElementById('quizFamiliarityBar').style.width = `${familiarity}%`;
+                }
+            });
+        }
+
+        function listenToClassmatesProgress() {
+            db.ref('users').on('value', (snapshot) => {
+                const data = snapshot.val();
+                const tbody = document.getElementById('classmatesTableBody');
+                const adminTbody = document.getElementById('adminTableBody');
+                const sidebarPeerList = document.getElementById('sidebarPeerList');
+                
+                tbody.innerHTML = '';
+                sidebarPeerList.innerHTML = '';
+                if(adminTbody) adminTbody.innerHTML = '';
+
+                if (!data) {
+                    tbody.innerHTML = '<tr><td colspan="4">No student records found.</td></tr>';
+                    sidebarPeerList.innerHTML = '<li style="font-size:0.85rem; color:#777;">No active students.</li>';
+                    return;
+                }
+
+                Object.keys(data).forEach(key => {
+                    const u = data[key];
+                    const isOnline = u.status === 'online';
+                    const tag = isOnline ? '<span class="online-tag">Online</span>' : '<span class="offline-tag">Offline</span>';
+                    
+                    const userScoreVal = u.score || 0;
+                    const userAnsVal = u.answeredCount || 0;
+                    const peerScoreText = `${userScoreVal}/${userAnsVal}`;
+
+                    // Full Table View
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${u.name}</strong></td>
+                        <td>${tag}</td>
+                        <td><strong>${peerScoreText}</strong></td>
+                        <td>${u.familiarity || 0}%</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    // Sidebar Live Progress Feed
+                    const li = document.createElement('li');
+                    li.className = 'live-peer-item';
+                    li.innerHTML = `
+                        <div>
+                            <strong>${u.name}</strong> ${tag}<br>
+                            <span style="font-size:0.78rem; color:#666;">Familiarity: ${u.familiarity || 0}%</span>
+                        </div>
+                        <div style="font-weight:bold; color:var(--green); font-size:0.95rem;">
+                            ${peerScoreText}
+                        </div>
+                    `;
+                    sidebarPeerList.appendChild(li);
+
+                    // Admin Table View
+                    if (adminTbody) {
+                        const adminTr = document.createElement('tr');
+                        adminTr.innerHTML = `
+                            <td><strong>${u.name}</strong></td>
+                            <td><input type="number" id="score_${key}" value="${u.score || 0}" style="width:70px;"></td>
+                            <td><input type="number" id="fam_${key}" value="${u.familiarity || 0}" style="width:70px;"> %</td>
+                            <td>${tag}</td>
+                            <td>
+                                <button class="action-btn edit-btn" onclick="saveStudentByAdmin('${key}')">Save</button>
+                                <button class="action-btn delete-btn" onclick="deleteStudentByAdmin('${key}')">Delete</button>
+                            </td>
+                        `;
+                        adminTbody.appendChild(adminTr);
+                    }
+                });
+            });
+        }
+
+        // ============================================================
+        // 4. OLD TESTAMENT STRICT FILTERING & PERSISTENT QUESTION POOL
+        // ============================================================
+        function isOldTestamentQuestion(item) {
+            if (!item) return false;
+            const fullText = `${item.prompt || ''} ${item.answer || ''} ${item.story || ''} ${item.tip || ''}`.toLowerCase();
+            return !ntKeywords.some(keyword => fullText.includes(keyword));
+        }
+
+        function buildStudent1000QuestionPool(baseOtList) {
+            const pool = [];
+            const targetCount = 1000;
+            const baseLen = baseOtList.length;
+
+            if (baseLen === 0) return [];
+
+            for (let i = 1; i <= targetCount; i++) {
+                let srcItem = baseOtList[(i - 1) % baseLen];
+                pool.push({
+                    id: i,
+                    prompt: srcItem.prompt || srcItem.question || "Question Prompt",
+                    answer: srcItem.answer || "",
+                    variations: srcItem.variations || "",
+                    story: srcItem.story || "",
+                    tip: srcItem.tip || ""
+                });
+            }
+            return pool;
+        }
+
+        function loadQuestionsFromFirebase() {
+            db.ref().once('value').then((snapshot) => {
+                const val = snapshot.val();
+                let questionsList = [];
+
+                if (val) {
+                    if (val.questions) {
+                        questionsList = Array.isArray(val.questions) ? val.questions : Object.values(val.questions);
+                    } else if (Array.isArray(val)) {
+                        questionsList = val.filter(i => i && (i.prompt || i.question));
+                    } else if (typeof val === 'object') {
+                        questionsList = Object.values(val).filter(i => i && (i.prompt || i.question));
+                    }
+                }
+
+                const otFilteredQuestions = questionsList.filter(item => isOldTestamentQuestion(item));
+
+                if (otFilteredQuestions.length > 0) {
+                    allMasterQuestions = otFilteredQuestions;
+                    
+                    // Fetch student's current answered count from Firebase to retain remaining count
+                    db.ref('users/' + currentUserId).once('value').then((userSnap) => {
+                        const uData = userSnap.val() || {};
+                        const savedAnswered = uData.answeredCount || 0;
+
+                        // Generate 1000 pool and splice answered questions
+                        let fullPool = buildStudent1000QuestionPool(allMasterQuestions);
+                        availableQuestions = fullPool.slice(savedAnswered);
+                        
+                        showNextQuestion();
+                    });
+                } else {
+                    document.getElementById('question-text').textContent = "No valid Old Testament questions found in database.";
+                }
+            }).catch(err => {
+                console.error("Firebase fetch error:", err);
+                document.getElementById('question-text').textContent = "Failed to load questions from Firebase.";
+            });
+        }
+
+        function showNextQuestion() {
+            const questionBox = document.getElementById('question-text');
+            const statusText = document.getElementById('quiz-status-text');
+            const inputField = document.getElementById('openAnswerInput');
+            const explanationBox = document.getElementById('explanationBox');
+            const submitBtn = document.getElementById('submitAndNextBtn');
+            const praiseBanner = document.getElementById('praiseBanner');
+
+            inputField.value = '';
+            inputField.disabled = false;
+            explanationBox.style.display = 'none';
+            praiseBanner.style.display = 'none';
+            submitBtn.textContent = 'Submit Answer';
+            isAnsweredCurrent = false;
+
+            if (!availableQuestions || availableQuestions.length === 0) {
+                questionBox.innerText = "🎉 1,000-Item Old Testament Assessment Completed!";
+                statusText.innerText = "No remaining questions.";
+                inputField.style.display = 'none';
+                submitBtn.style.display = 'none';
+                return;
+            }
+
+            statusText.innerText = `Remaining OT Questions: ${availableQuestions.length} of 1000`;
+
+            const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+            currentQuestion = availableQuestions.splice(randomIndex, 1)[0];
+
+            questionBox.innerText = currentQuestion.prompt;
+        }
+
+        function levenshteinDistance(a, b) {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function analyzeAnswerSmart(userAns, expectedAns, variations) {
+            let uInput = userAns.toLowerCase().trim().replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' ');
+            let expClean = expectedAns.toLowerCase().replace(/\([^)]*\)/g, '').trim().replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' ');
+
+            if (!uInput) return { isCorrect: false, explanation: "No answer provided." };
+
+            let targetList = [expClean];
+            if (variations) {
+                let vars = variations.split(/[\/\,]|\bor\b/gi).map(v => v.toLowerCase().replace(/\([^)]*\)/g, '').trim().replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' '));
+                targetList = targetList.concat(vars);
+            }
+
+            for (let target of targetList) {
+                if (uInput === target) return { isCorrect: true, explanation: "Exact match found!" };
+            }
+
+            for (let target of targetList) {
+                let dist = levenshteinDistance(uInput, target);
+                let allowed = target.length > 6 ? 2 : (target.length > 3 ? 1 : 0);
+                if (dist <= allowed) return { isCorrect: true, explanation: "Accepted with minor spelling variation." };
+            }
+
+            return { isCorrect: false, explanation: "Your answer did not match expected Biblical references." };
+        }
+
+        function submitUserAnswer() {
+            if (isAnsweredCurrent) {
+                showNextQuestion();
+                return;
+            }
+
+            const inputField = document.getElementById('openAnswerInput');
+            const userText = inputField.value.trim();
+
+            if (!userText) {
+                alert("Please type an answer before submitting.");
+                return;
+            }
+
+            const expectedAns = currentQuestion.answer || "";
+            const vars = currentQuestion.variations || "";
+
+            const evalResult = analyzeAnswerSmart(userText, expectedAns, vars);
+            const isCorrect = evalResult.isCorrect;
+
+            if (isCorrect) {
+                userScore++;
+                showPraiseMessage();
+            }
+            answeredCount++;
+
+            inputField.disabled = true;
+            isAnsweredCurrent = true;
+
+            showExplanation(isCorrect, evalResult.explanation);
+            document.getElementById('submitAndNextBtn').textContent = "Next Question →";
+
+            updateFirebaseProgress();
+        }
+
+        function showPraiseMessage() {
+            const praiseBanner = document.getElementById('praiseBanner');
+            praiseBanner.innerHTML = `🙌 Praise the Lord! Continue answering, you can do it, <u>${currentUser}</u>! 🎉`;
+            praiseBanner.style.display = 'block';
+        }
+
+        function showExplanation(isCorrect, feedback) {
+            const titleElem = document.getElementById('explanationTitle');
+            const detailsElem = document.getElementById('explanationDetails');
+
+            if (isCorrect) {
+                titleElem.innerHTML = "<span style='color:var(--green);'>🎉 CORRECT ANSWER!</span>";
+            } else {
+                titleElem.innerHTML = "<span style='color:var(--red);'>❌ INCORRECT ANSWER</span>";
+            }
+
+            detailsElem.innerHTML = `
+                <div class="study-section">
+                    <strong>🤖 Evaluation Feedback:</strong> <em>${feedback}</em>
+                </div>
+                <div class="study-section">
+                    <strong>📌 Standard Answer:</strong> ${currentQuestion.answer || 'N/A'}
+                </div>
+                <div class="study-section">
+                    <strong>✨ Accepted Variations:</strong><br><em>${currentQuestion.variations || 'None'}</em>
+                </div>
+                <div class="study-section">
+                    <strong>📖 Bible Story & Context:</strong><br>${currentQuestion.story || 'N/A'}
+                </div>
+                <div class="study-section">
+                    <strong>💡 Memory Tip:</strong><br>${currentQuestion.tip || 'N/A'}
+                </div>
+            `;
+
+            document.getElementById('explanationBox').style.display = 'block';
+        }
+
+        function updateFirebaseProgress() {
+            let familiarityCalc = answeredCount > 0 ? Math.min(100, Math.round((userScore / answeredCount) * 100)) : 0;
+
+            db.ref('users/' + currentUserId).update({
+                score: userScore,
+                familiarity: familiarityCalc,
+                answeredCount: answeredCount
+            });
+        }
+
+        // ============================================================
+        // 5. ADMIN CONTROL FUNCTIONS (PASSWORD: 1234)
+        // ============================================================
+        function unlockAdmin() {
+            const pass = document.getElementById('adminPassInput').value;
+            if (pass === "1234") {
+                document.getElementById('adminLockCard').style.display = "none";
+                document.getElementById('adminContentCard').style.display = "block";
+            } else {
+                alert("Incorrect Password! Access Denied.");
+            }
+        }
+
+        function saveStudentByAdmin(userId) {
+            const newScore = parseInt(document.getElementById(`score_${userId}`).value) || 0;
+            
+            db.ref('users/' + userId).once('value').then(snapshot => {
+                const uData = snapshot.val() || {};
+                let userAnswers = uData.answeredCount || 1; 
+
+                let newFam = Math.min(100, Math.round((newScore / userAnswers) * 100));
+                
+                const manualFamInput = parseInt(document.getElementById(`fam_${userId}`).value);
+                if (!isNaN(manualFamInput) && manualFamInput !== uData.familiarity) {
+                    newFam = manualFamInput;
+                }
+
+                db.ref('users/' + userId).update({
+                    score: newScore,
+                    familiarity: newFam
+                }).then(() => {
+                    alert(`Student record updated! New score set to ${newScore} and Familiarity set to ${newFam}%.`);
+                });
+            });
+        }
+
+        function deleteStudentByAdmin(userId) {
+            if (confirm("Are you sure you want to delete this student record?")) {
+                db.ref('users/' + userId).remove().then(() => {
+                    alert("Record deleted successfully!");
+                });
+            }
+        }
+    </script>
+</body>
+</html>
